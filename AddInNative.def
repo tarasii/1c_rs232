@@ -1,0 +1,6 @@
+LIBRARY    "AddInNative"
+
+EXPORTS
+GetClassObject
+DestroyObject
+GetClassNames
