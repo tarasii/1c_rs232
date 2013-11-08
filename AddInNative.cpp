@@ -699,16 +699,16 @@ uint8_t CAddInNative::Send(void)
 	l = m_cmd.length();
 	if (l > 256)
 	{
-		m_err = 9;
-		return 9; //to long command
+		m_err = -1;
+		return -1; //to long command
 	}
 
 	s = wstrtostr(m_cmd);
 	l = s.length();
 	if (l > 256)
 	{
-		m_err = 9;
-		return 9; //to long command
+		m_err = -1;
+		return -1; //to long command
 	}
 
 	memcpy(OUTBUFFER, s.c_str(), l);
@@ -723,8 +723,8 @@ uint8_t CAddInNative::Send(void)
 	bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
 	if (!bStatus)
 	{
-		m_err = -5;
-		return -5; //error while data send
+		m_err = -2;
+		return -2; //error while data send
 	}
 
 	return (int) bytes_written;
@@ -745,8 +745,8 @@ uint8_t CAddInNative::Recieve(void)
 	bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
 	if (!bStatus)
 	{
-		m_err = 6;
-		return 6; //error while data recieve
+		m_err = -1;
+		return -1; //error while data recieve
 	}
 
 	s = INBUFFER;
@@ -754,7 +754,7 @@ uint8_t CAddInNative::Recieve(void)
 	s.resize(bytes_read);
 	m_ans = strtowstr(s);
 
-	return 0;
+	return (int)bytes_read;
 }
 
 
