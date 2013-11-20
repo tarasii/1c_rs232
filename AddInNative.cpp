@@ -344,7 +344,7 @@ long CAddInNative::GetNParams(const long lMethodNum)
     switch(lMethodNum)
     { 
     case eMethOpen:
-        return 4;
+        return 5;
     case eMethSend:
 	case eMethDelay:
 		return 1;
@@ -690,7 +690,7 @@ uint8_t CAddInNative::Send(void)
 
 	int		bStatus;
 	uint8_t l;
-	char ss[50];
+	//char ss[50];
 
 	std::string s;
 
