@@ -6,8 +6,13 @@ RS232 communication port, such as: modems, thermal printers, bar code scanners a
 
 Methods:
 
-int Open(int nPort, int Baud, int nBit, int Parity, int ) - open port, return 0 if success;
-Close()       - close port;
+int Open(int nPort, int Baud, int nBit, int Parity, int StopBit) - open port, return 0 if success;
+	nPort - 1..;
+	Baud - 300, 600, 1200, 9600, 14400, 19200, 57600, 115200;
+	nBit - 7,8;
+	Parity - 0: None, 1: Odd, 2: Even, 3:Mark, 4:Space;
+	StopBit - 0: 1.0, 1: 1.5; 2: 2.0.
+	Close()       - close port;
 int Send(wstr data) - send data;
 int Receive() - receive data from port - return number of received chars; 
 Delay(int dt) - delay dt milliseconds.
@@ -24,4 +29,7 @@ wstr Command - last command to port;
 wstr Answer  - answer from port;
 int Error    - last error code
 
+1C: Examples:
 
+InfoBase - modem demo;
+InfoBaseMA - Maria 301 demo.
