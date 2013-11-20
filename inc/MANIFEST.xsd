@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://v8.1c.ru/8.2/addin/bundle" targetNamespace="http://v8.1c.ru/8.2/addin/bundle" elementFormDefault="qualified" attributeFormDefault="unqualified">
+    <xs:complexType name="Bundle">
+        <xs:annotation>
+            <xs:documentation>Описание bundle<xs:documentation>
+        </xs:annotation>
+        <xs:sequence>
+            <xs:element name="component" type="Component" maxOccurs="unbounded"/>
+        </xs:sequence>
+    </xs:complexType>
+    <xs:complexType name="Component">
+        <xs:attribute name="os" type="OSType" use="required">
+            <xs:annotation>
+                <xs:documentation>Тип платформы<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="path" type="xs:string" use="required">
+            <xs:annotation>
+                <xs:documentation>Имя файла<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="type" type="ComponentType" use="required">
+            <xs:annotation>
+                <xs:documentation>Тип компоненты<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="object" type="xs:string" >
+            <xs:annotation>
+                <xs:documentation>Имя объекта<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="arch" type="ArchType" use="required">
+            <xs:annotation>
+                <xs:documentation>Тип архитектуры<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="client" type="ClientType" >
+            <xs:annotation>
+                <xs:documentation>Тип клиента<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+        <xs:attribute name="clientVersion" type="xs:string" >
+            <xs:annotation>
+                <xs:documentation>Версия клиента<xs:documentation>
+            </xs:annotation>
+        </xs:attribute>
+    </xs:complexType>
+    <xs:simpleType name="OSType">
+        <xs:enumeration value="Windows"/>
+        <xs:enumeration value="Linux"/>
+    </xs:simpleType>
+    <xs:simpleType name="ComponentType">
+        <xs:enumeration value="native"/>
+        <xs:enumeration value="com"/>
+        <xs:enumeration value="plugin"/>
+    </xs:simpleType>
+    <xs:simpleType name="ArchType">
+        <xs:enumeration value="i386"/>
+        <xs:enumeration value="x86_64"/>
+    </xs:simpleType>
+    <xs:simpleType name="ClientType">
+        <xs:enumeration value="1C:Enterprise"/>
+        <xs:enumeration value="Firefox"/>
+        <xs:enumeration value="MSIE"/>
+    </xs:simpleType>
+</xs:schema>
