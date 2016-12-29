@@ -23,6 +23,7 @@ public:
 		ePropCommand,
 		ePropAnswer,
 		ePropError,
+		ePropLoging,
         ePropLast      // Always last
     };
 
@@ -33,7 +34,20 @@ public:
         eMethSend,
         eMethRecieve,
 		eMethDelay,
-        eMethLast      // Always last
+        eMethSendIKS,
+        eMethToHex,
+		eMethStartTimer,
+		eMethStopTimer,        
+        eMethSendHex,
+        eMethRecieveHex,
+        eMethFromHex,
+        eMethVersion,
+        eMethTest,
+        eMethSetParam,
+        eMethGetParams,
+        eMethGetInfo,
+        eMethGetMore,
+		eMethLast      // Always last
     };
 
 	//enum Parity
@@ -79,18 +93,25 @@ private:
                     const wchar_t* descriptor, long code);
 
 	bool wstring_to_p(std::wstring s, tVariant* val);
+	
 
 	uint8_t CAddInNative::OpenPort(void);
 	void CAddInNative::ClosePort(void);
 	void CAddInNative::Delay(int nDelay);
-	uint8_t CAddInNative::Send(void);
-	uint8_t CAddInNative::Recieve(void);
+	int CAddInNative::Send(void);
+	int CAddInNative::SendIKS(uint8_t cmd);
+	int CAddInNative::Recieve(void);
+	int CAddInNative::SendHex(void);
+	int CAddInNative::RecieveHex(void);
+	std::wstring CAddInNative::ToHEX(std::wstring s);
+	std::wstring CAddInNative::FromHEX(std::wstring s);
+	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
 
 	// Attributes
     IAddInDefBase      *m_iConnect;
     IMemoryManager     *m_iMemory;
 
-	uint8_t             m_err;
+	int             m_err;
 	
 	uint8_t             m_port;
 	uint32_t            m_baud;
@@ -98,9 +119,12 @@ private:
 	uint8_t             m_parity;
 	uint8_t             m_stopBit;
 
-	bool                m_isOpen;
+	uint8_t             m_num;
 
-    //uint32_t            m_uiTimer;
+	bool                m_isOpen;
+	bool                m_loging;
+
+    uint32_t            m_uiTimer;
 
 	std::wstring		m_cmd;
 	std::wstring		m_ans;
