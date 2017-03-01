@@ -6,6 +6,7 @@
 #include "IMemoryManager.h"
 
 #include <string>
+#include "port.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 // class CAddInNative
@@ -43,10 +44,9 @@ public:
         eMethFromHex,
         eMethVersion,
         eMethTest,
-        eMethSetParam,
-        eMethGetParams,
-        eMethGetInfo,
-        eMethGetMore,
+        eMethInitMaria,
+		eMethSendMaria,
+		eMethStartPollACS,
 		eMethLast      // Always last
     };
 
@@ -86,7 +86,10 @@ public:
                 tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray);
     // LocaleBase
     virtual void ADDIN_API SetLocale(const WCHAR_T* loc);
-    
+	
+	int CAddInNative::Recieve(void);
+	std::wstring		m_ans;
+
 private:
     long findName(wchar_t* names[], const wchar_t* name, const uint32_t size) const;
     void addError(uint32_t wcode, const wchar_t* source, 
@@ -95,17 +98,19 @@ private:
 	bool wstring_to_p(std::wstring s, tVariant* val);
 	
 
-	uint8_t CAddInNative::OpenPort(void);
+	uint8_t CAddInNative::OpenPort(tVariant* paParams);
 	void CAddInNative::ClosePort(void);
 	void CAddInNative::Delay(int nDelay);
 	int CAddInNative::Send(void);
 	int CAddInNative::SendIKS(uint8_t cmd);
-	int CAddInNative::Recieve(void);
 	int CAddInNative::SendHex(void);
 	int CAddInNative::RecieveHex(void);
+	bool CAddInNative::SendMaria( tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray);
+	uint8_t CAddInNative::InitMaria(void);
 	std::wstring CAddInNative::ToHEX(std::wstring s);
 	std::wstring CAddInNative::FromHEX(std::wstring s);
 	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
+
 
 	// Attributes
     IAddInDefBase      *m_iConnect;
@@ -113,21 +118,18 @@ private:
 
 	int             m_err;
 	
-	uint8_t             m_port;
-	uint32_t            m_baud;
-	uint8_t             m_byteSize;
-	uint8_t             m_parity;
-	uint8_t             m_stopBit;
+
 
 	uint8_t             m_num;
 
-	bool                m_isOpen;
 	bool                m_loging;
 
     uint32_t            m_uiTimer;
 
 	std::wstring		m_cmd;
-	std::wstring		m_ans;
+//	std::wstring		m_ans;
+
+	CPort				m_ComPort;
 
 };
 

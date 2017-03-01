@@ -1393,6 +1393,10 @@
 				</FileConfiguration>
 			</File>
 			<File
+				RelativePath=".\port.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\stdafx.cpp"
 				>
 				<FileConfiguration
@@ -1532,6 +1536,10 @@
 			>
 			<File
 				RelativePath=".\AddInNative.h"
+				>
+			</File>
+			<File
+				RelativePath=".\port.h"
 				>
 			</File>
 			<File

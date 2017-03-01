@@ -19,11 +19,18 @@
 
 #define BASE_ERRNO     7
 
-static wchar_t *g_PropNames[] = {L"IsOpen", L"Port", L"Baud", L"ByteSize", L"Parity", L"StopBit", L"Command", L"Answer", L"Error", L"Loging"};
-static wchar_t *g_MethodNames[] = {L"Open", L"Close", L"Send", L"Receive", L"Delay", L"SendIKS", L"toHEX", L"StartTimer", L"StopTimer", L"SendHex", L"ReceiveHex", L"fromHEX", L"Version", L"Test", L"SetParam", L"GetParams", L"GetInfo", L"GetMore"};
+static wchar_t *g_PropNames[] = {L"IsOpen", L"Port", L"Baud", L"ByteSize", L"Parity", L"StopBit", 
+								 L"Command", L"Answer", L"Error", L"Loging"};
+static wchar_t *g_MethodNames[] = {L"Open", L"Close", L"Send", L"Receive", L"Delay", L"SendIKS", 
+								   L"toHEX", L"StartTimer", L"StopTimer", L"SendHex", L"ReceiveHex", 
+								   L"fromHEX", L"Version", L"Test", L"InitMaria", L"SendMaria", L"StartPollACS"};
 
-static wchar_t *g_PropNamesRu[] = {L"Открыт", L"Порт", L"Скорость", L"Байт", L"Четность", L"СтопБит", L"Команда", L"Ответ", L"Ошибка", L"Логирование"};
-static wchar_t *g_MethodNamesRu[] = { L"Открыть", L"Закрыть", L"Отправить", L"Получить", L"Задержка", L"ОтправитьИКС", L"в16", L"СтартТаймер", L"СтопТаймер", L"Отправить16", L"Получить16", L"из16", L"ПолучитьНомерВерсии", L"ТестУстройства", L"УстановитьПараметр", L"ПолучитьПараметры", L"ПолучитьОписание", L"ПолучитьДополнительныеДействия"};
+static wchar_t *g_PropNamesRu[] = {L"Открыт", L"Порт", L"Скорость", L"Байт", L"Четность", L"СтопБит", 
+								   L"Команда", L"Ответ", L"Ошибка", L"Логирование"};
+static wchar_t *g_MethodNamesRu[] = {L"Открыть", L"Закрыть", L"Отправить", L"Получить", L"Задержка", 
+									 L"ОтправитьИКС", L"в16", L"СтартТаймер", L"СтопТаймер", L"Отправить16", 
+									 L"Получить16", L"из16", L"ПолучитьНомерВерсии", L"ТестУстройства", 
+									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС"};
 
 static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
 static IAddInDefBase *pAsyncEvent = NULL;
@@ -31,26 +38,15 @@ static IAddInDefBase *pAsyncEvent = NULL;
 HANDLE hComm;
 HANDLE hTempFile;
 
+CAddInNative *tst;
+
 char const hex[16] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' };
 
-std::wstring verwstr = L"1.4.2";
-std::wstring st1wstr = L"IKS";
+std::wstring verwstr = L"1.5.0";
+std::wstring st1wstr = L"RS232";
 std::wstring st2wstr = L"QUAD";
-std::wstring st3wstr = L"Фискальный регистратор";
 std::wstring addrwstr = L"kermit.kiev.ua";
-std::wstring paramwstr = L"<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\
-<Settings>\
-	<Group Caption=\"Параметры устройства\">\
-		<Parameter Name=\"Port\" Caption=\"Port\" TypeValue=\"Number\" DefaultValue=\"1\"></Parameter>\
-		<Parameter Name=\"Speed\" Caption=\"Speed\" TypeValue=\"Number\" DefaultValue=\"9600\" MasterParameterOperation=\"NotEqual\" MasterParameterName=\"Port\" MasterParameterValue=\"0\">\
-			<ChoiceList>\
-				<Item Value=\"9600\">9600</Item>\
-				<Item Value=\"19200\">19200</Item>\
-				<Item Value=\"38400\">38400</Item>\
-			</ChoiceList>\
-		</Parameter>\
-	</Group>\
-</Settings>";
+
 std::wstring nopewstr = L"";
 
 static wchar_t strOK[] = L"OK";
@@ -101,6 +97,13 @@ VOID CALLBACK MyTimerProc(
         UINT idEvent, // timer identifier
         DWORD dwTime // current system time
 );
+
+VOID CALLBACK ACSPollProc(
+  HWND hwnd,    // handle of window for timer messages
+  UINT uMsg,    // WM_TIMER message
+  UINT idEvent, // timer identifier
+  DWORD dwTime  // current system time
+);
 #else
 static void MyTimerProc(int sig);
 #endif //__linux__
@@ -111,22 +114,12 @@ CAddInNative::CAddInNative()
 {
     m_iMemory = 0;
     m_iConnect = 0;
-
-	m_port = 1;
-	m_baud = 9600;
-	m_parity = 0;
-	m_stopBit = 0;
-	m_err = 0;
-	m_byteSize = 8;
-
-	m_isOpen = false;
+	tst = this;
 }
 //---------------------------------------------------------------------------//
 CAddInNative::~CAddInNative()
 {
-	if (m_isOpen){
-		CAddInNative::ClosePort();
-	}
+	m_ComPort.Close();
 }
 //---------------------------------------------------------------------------//
 bool CAddInNative::Init(void* pConnection)
@@ -139,7 +132,7 @@ long CAddInNative::GetInfo()
 { 
     // Component should put supported component technology version 
     // This component supports 2.0 version
-    return 2016; 
+    return 2017; 
 }
 //---------------------------------------------------------------------------//
 void CAddInNative::Done()
@@ -150,7 +143,7 @@ void CAddInNative::Done()
 //---------------------------------------------------------------------------//
 bool CAddInNative::RegisterExtensionAs(WCHAR_T** wsExtensionName)
 { 
-    wchar_t *wsExtension = L"IKS";
+    wchar_t *wsExtension = L"rs232";
     int iActualSize = ::wcslen(wsExtension) + 1;
     WCHAR_T* dest = 0;
 
@@ -224,27 +217,27 @@ bool CAddInNative::GetPropVal(const long lPropNum, tVariant* pvarPropVal)
     {
     case ePropIsOpen:
         TV_VT(pvarPropVal) = VTYPE_BOOL;
-        TV_BOOL(pvarPropVal) = m_isOpen;
+		TV_BOOL(pvarPropVal) = m_ComPort.IsOpen();
         break;
     case ePropPort:
 		TV_VT(pvarPropVal) = VTYPE_UI1;
-		TV_UI1(pvarPropVal) = m_port;
+		TV_UI1(pvarPropVal) = m_ComPort.GetPortNumber();
 		break;
     case ePropBaud:
 		TV_VT(pvarPropVal) = VTYPE_UI4;
-		TV_UI4(pvarPropVal) = m_baud;
+		TV_UI4(pvarPropVal) = m_ComPort.GetBaud();
 		break;    
     case ePropByteSize:
 		TV_VT(pvarPropVal) = VTYPE_UI1;
-		TV_UI1(pvarPropVal) = m_byteSize;
+		TV_UI1(pvarPropVal) = m_ComPort.GetByteSize();
 		break;    
 	case ePropParity:
 		TV_VT(pvarPropVal) = VTYPE_UI1;
-		TV_UI1(pvarPropVal) = m_parity;
+		TV_UI1(pvarPropVal) = m_ComPort.GetParity();
 		break;
     case ePropStopBit:
 		TV_VT(pvarPropVal) = VTYPE_UI1;
-		TV_UI1(pvarPropVal) = m_stopBit;
+		TV_UI1(pvarPropVal) = m_ComPort.GetStopBit();
 		break;
     case ePropError:
 		TV_VT(pvarPropVal) = VTYPE_I4;
@@ -275,7 +268,8 @@ bool CAddInNative::SetPropVal(const long lPropNum, tVariant *varPropVal)
         //if (TV_VT(varPropVal) != VTYPE_BOOL)
         //    return false;
         //m_boolEnabled = TV_BOOL(varPropVal);
-        //break;
+        return false;        
+		break;
 	case ePropLoging:
         if (TV_VT(varPropVal) != VTYPE_BOOL)
             return false;
@@ -392,13 +386,10 @@ long CAddInNative::GetNParams(const long lMethodNum)
 { 
     switch(lMethodNum)
     { 
-    case eMethGetInfo:
-        return 7;
     case eMethOpen:
         return 5;
     case eMethSendIKS:
     case eMethTest:
-    case eMethSetParam:
 		return 2;
     case eMethSend:
 	case eMethStartTimer:
@@ -406,8 +397,7 @@ long CAddInNative::GetNParams(const long lMethodNum)
 	case eMethDelay:
 	case eMethToHex:
 	case eMethFromHex:
-	case eMethGetParams:
-	case eMethGetMore:
+	case eMethSendMaria:
 		return 1;
     default:
         return 0;
@@ -472,6 +462,15 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 			return true;
 		}
         break;
+	case eMethSendMaria:
+		switch(lParamNum)
+		{
+		case 1:
+     		wstring_to_p((L"SYNC"), pvarParamDefValue);
+			return true;
+		default:
+			return false;
+		}
 	case eMethStartTimer:
 		switch (lParamNum)
 		{
@@ -504,6 +503,7 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
     case eMethOpen:
     case eMethSend:
     case eMethSendIKS:
+    case eMethSendMaria:
     case eMethRecieve:
     case eMethSendHex:
     case eMethRecieveHex:
@@ -511,7 +511,6 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
     case eMethFromHex:
     case eMethVersion:
     case eMethTest:
-	case eMethSetParam:
         return true;
     default:
         return false;
@@ -549,23 +548,10 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
         m_uiTimer = 0;
         //pAsyncEvent = NULL;
         break;
-    case eMethGetParams:
-		wstring_to_p(paramwstr, paParams);
-        break;
-    case eMethGetInfo:
-		wstring_to_p(st1wstr, paParams);
-		wstring_to_p(st2wstr, paParams+1);
-		wstring_to_p(st3wstr, paParams+2);
-		TV_VT(paParams+3) = VTYPE_I4;
-		TV_I4(paParams+3) = 2016;
-		TV_VT(paParams+4) = VTYPE_BOOL;
-		TV_BOOL(paParams+4) = false;
-		TV_VT(paParams+5) = VTYPE_BOOL;
-		TV_BOOL(paParams+5) = true;
-		wstring_to_p(addrwstr, paParams+6);
-		break;
-    case eMethGetMore:
-		wstring_to_p(nopewstr, paParams);
+    case eMethStartPollACS:
+		if (!pAsyncEvent) pAsyncEvent = m_iConnect;
+        m_uiTimer = ::SetTimer(NULL,0,100,(TIMERPROC)ACSPollProc);
+        //pAsyncEvent = NULL;
         break;
 
     default:
@@ -592,16 +578,9 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
             return false;
             
 		res = 0;
-		if (!m_isOpen)
+		if (!m_ComPort.IsOpen())
 		{
-
-			m_port = TV_UI1(paParams);
-			m_baud = TV_UI4(paParams + 1);
-			m_parity = TV_UI1(paParams + 2);
-			m_byteSize = TV_UI1(paParams + 3);
-			m_stopBit = TV_UI1(paParams + 4);
-
-			res = CAddInNative::OpenPort();
+			res = CAddInNative::OpenPort(paParams);
 		}
 		else res = 5; //allready opened
 
@@ -633,6 +612,10 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		TV_VT(pvarRetValue) = VTYPE_I4;
 		TV_I4(pvarRetValue) = res;
 		ret = true;
+		break;
+
+	case eMethSendMaria:
+		ret = CAddInNative::SendMaria(pvarRetValue, paParams, lSizeArray);
 		break;
 
 	case eMethRecieve:
@@ -686,7 +669,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		break;
 	case eMethTest:
 		ret = false;
-		res = CAddInNative::OpenPort();
+		res = CAddInNative::OpenPort(paParams);
 		if (res == 0) {	
 			ret = true;
 			//CAddInNative::ClosePort();
@@ -701,24 +684,7 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 
 		ret = true;
 		break;
-    case eMethSetParam:
-		ret = false;
-		if (TV_VT(paParams) == VTYPE_PWSTR)
-		{
-			tmpwstr = (paParams)->pwstrVal;
-			if ((tmpwstr.size() == 4) && std::equal(tmpwstr.begin(), tmpwstr.end(), L"Port")){
-				m_port = TV_UI1(paParams + 1);
-				ret = true;
-			}
-			if ((tmpwstr.size() == 5) && std::equal(tmpwstr.begin(), tmpwstr.end(), L"Speed")){
-				m_baud = TV_UI4(paParams + 1);
-				ret = true;
-			}
-			TV_VT(pvarRetValue) = VTYPE_BOOL;
-			TV_BOOL(pvarRetValue) = ret;
-			ret = true;
-		}
-        break;
+
 	}
     return ret; 
 }
@@ -745,6 +711,35 @@ VOID CALLBACK MyTimerProc(
         pAsyncEvent->ExternalEvent(who, what, wstime);
         delete[] wstime;
     }
+}
+
+VOID CALLBACK ACSPollProc(
+  HWND hwnd,    // handle of window for timer messages
+  UINT uMsg,    // WM_TIMER message
+  UINT idEvent, // timer identifier
+  DWORD dwTime  // current system time
+)
+{
+    if (!pAsyncEvent)
+        return;
+
+    wchar_t *who = L"ASC", *what = L"Weight";
+
+	tst->Recieve();
+
+	std::string::size_type found = tst->m_ans.find_last_of(L"\x03");
+	if (found!=std::string::npos)
+		tst->m_ans = tst->m_ans.substr(0,found);
+	found = tst->m_ans.find_last_of(L"\x02");
+	if (found!=std::string::npos)
+		tst->m_ans = tst->m_ans.substr(found+1);
+
+	wchar_t* wc = (wchar_t*)tst->m_ans.c_str();    
+    if (wc)
+    {
+		pAsyncEvent->ExternalEvent(who, what, wc);
+    }
+
 }
 #else
 void MyTimerProc(int sig)
@@ -775,6 +770,9 @@ void MyTimerProc(int sig)
     }
 }
 #endif
+
+
+
 //---------------------------------------------------------------------------//
 void CAddInNative::SetLocale(const WCHAR_T* loc)
 {
@@ -828,11 +826,16 @@ long CAddInNative::findName(wchar_t* names[], const wchar_t* name,
 }
 //---------------------------------------------------------------------------//
 
-uint8_t CAddInNative::OpenPort(void)
+uint8_t CAddInNative::OpenPort(tVariant* paParams)
 {
-	char	pcCommPort[32];
-	DCB		dcb;
-	COMMTIMEOUTS timeouts;
+	//char	pcCommPort[32];
+	//DCB		dcb;
+	//COMMTIMEOUTS timeouts;
+	uint8_t             m_port;
+	uint32_t            m_baud;
+	uint8_t             m_byteSize;
+	uint8_t             m_parity;
+	uint8_t             m_stopBit;
 
 	m_err = 0;
 	m_num = 1;
@@ -840,73 +843,36 @@ uint8_t CAddInNative::OpenPort(void)
 	TCHAR lpTempPathBuffer[MAX_PATH];
 	DWORD	dwStatus;
 
+			m_port = TV_UI1(paParams);
+			m_baud = TV_UI4(paParams + 1);
+			m_parity = TV_UI1(paParams + 2);
+			m_byteSize = TV_UI1(paParams + 3);
+			m_stopBit = TV_UI1(paParams + 4);
+
 	if (m_loging) 
 	{
 		dwStatus = GetTempPath(MAX_PATH, lpTempPathBuffer);
-		memcpy(lpTempPathBuffer + dwStatus, TEXT("iks.log"),14);
+		memcpy(lpTempPathBuffer + dwStatus, TEXT("rs232.log"),14);
 		//uRetVal = GetTempFileName(lpTempPathBuffer, TEXT("maria"), 0, szTempFileName);
 	    hTempFile = CreateFile((LPTSTR) lpTempPathBuffer,  GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);                // no template 
 		dwStatus = SetFilePointer(hTempFile, 0, NULL, FILE_END);
 	}
 
-	sprintf(pcCommPort, "\\\\.\\COM%d", m_port);
-	hComm = CreateFileA(pcCommPort, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-	if (hComm == INVALID_HANDLE_VALUE)
-	{
-		m_err = 1;
-		return 1; //error opening com port
-	}
-	if (!GetCommState(hComm, &dcb))
-	{
-		CAddInNative::ClosePort();
-		m_err = 2;
-		return 2;  //error geting com port settings
-	}
-	dcb.BaudRate	= m_baud;
-	dcb.ByteSize	= m_byteSize;
-	dcb.Parity		= m_parity;
-	dcb.StopBits	= m_stopBit;
-	//dcb.fDtrControl = DTR_CONTROL_DISABLE;
+	
+	m_ComPort.Open(m_port, m_baud, m_byteSize, m_parity, m_stopBit, true);
 
-	if (m_parity != 0) dcb.fParity = TRUE;
-
-	dcb.fDtrControl = DTR_CONTROL_ENABLE;
-	if (!SetCommState(hComm, &dcb))
-	{
-		CAddInNative::ClosePort();
-		m_err = 3;
-		return 3; //error write com port settings 
-	}
-
-	memset(&timeouts, 0, sizeof(timeouts));
-	timeouts.ReadTotalTimeoutConstant = 50;
-	timeouts.WriteTotalTimeoutConstant = 50;
-	timeouts.ReadIntervalTimeout = 0;
-	timeouts.ReadTotalTimeoutMultiplier = 0;
-	timeouts.WriteTotalTimeoutMultiplier = 0;
-	if (!SetCommTimeouts(hComm, &timeouts))
-	{
-		CAddInNative::ClosePort();
-		m_err = 4;
-		return 4; //error seting com port timeouts
-	}
-
-	m_isOpen = true;
 	write_log("\0\0\0\0\0", 5, 'o');
 
-	return 0;
-
+	return m_ComPort.GetLastError();
 }
 
 void CAddInNative::ClosePort(void)
 {
-	//if (m_isOpen) {
-	CloseHandle(hComm);
-	//}
 	
 	if (m_loging) CloseHandle(hTempFile);
 
-	m_isOpen = false;
+	m_ComPort.Close();
+
 	return;
 }
 
@@ -950,7 +916,7 @@ int CAddInNative::Send(void)
 	char	OUTBUFFER[256];
 	DWORD   bytes_written = 0;
 
-	int		bStatus;
+	//int		bStatus;
 	uint8_t l;
 	//char ss[50];
 
@@ -982,13 +948,16 @@ int CAddInNative::Send(void)
 	//s.resize(l+1);
 	//m_cmd.assign(s.begin(), s.end());
 
+	//bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
+	//if (!bStatus)
+	//{
+	//	m_err = -2;
+	//	return -2; //error while data send
+	//}
 
-	bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
-	if (!bStatus)
-	{
-		m_err = -2;
-		return -2; //error while data send
-	}
+	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) return m_err;
 
 	write_log(OUTBUFFER, l, 's');	
 	return (int) bytes_written;
@@ -1004,7 +973,7 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	uint8_t	TMPBUFFER[64];
 	DWORD   total_bytes_read = 0;
 
-	int		bStatus;
+	//int		bStatus;
 	int		l, i;
 	int		pos_begin = -1, pos_end = -1; 
 	int		cnt = 10;
@@ -1042,18 +1011,22 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	s = byte_2_str((char*) OUTBUFFER, l+7);
 	m_cmd.assign(s.begin(), s.end());
 
-	if (!m_isOpen)
+	if (!m_ComPort.IsOpen())
 	{
 		m_err = -1;
 		return -1; //to long command
 	}
 
-	bStatus = WriteFile(hComm, &OUTBUFFER, l+7, &bytes_written, NULL);
-	if (!bStatus)
-	{
-		m_err = -3;
-		return -3; //error while data send
-	}
+	//bStatus = WriteFile(hComm, &OUTBUFFER, l+7, &bytes_written, NULL);
+	//if (!bStatus)
+	//{
+	//	m_err = -3;
+	//	return -3; //error while data send
+	//}
+
+	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) return m_err;
 
 	m_num++;
 	write_log((char*)  OUTBUFFER, l+7, 'S');
@@ -1061,12 +1034,16 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	total_bytes_read = 0;
 	for (i=0; i<cnt && pos_end<0; i++){
 		bytes_read = 0;
-		bStatus = ReadFile(hComm, &TMPBUFFER, 64, &bytes_read, NULL);
-		if (!bStatus)
-		{
-			m_err = -4;
-			return -4; //error while data recieve
-		}
+		//bStatus = ReadFile(hComm, &TMPBUFFER, 64, &bytes_read, NULL);
+		//if (!bStatus)
+		//{
+		//	m_err = -4;
+		//	return -4; //error while data recieve
+		//}
+		
+		bytes_read = m_ComPort.ReadBuf(&TMPBUFFER, 64);
+		m_err = -m_ComPort.GetLastError();
+		if (m_err != 0) return m_err;
 
 		if (bytes_read){
 			memcpy(INBUFFER+total_bytes_read, TMPBUFFER, bytes_read);
@@ -1123,6 +1100,352 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	return (int) bytes_read;
 }
 
+bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray)
+{
+	int res = 1;
+	std::wstring p0;
+
+	char	SMBUFFER[50];
+    char	INBUFFER[500];
+    char	OUTBUFFER[255];
+	char	TMPBUFFER[50];
+
+    DWORD   bytes_read		 = 0;
+    DWORD   total_bytes_read = 0;
+    DWORD   bytes_written	 = 0;
+	
+	int		bStatus;
+	uint16_t i,l,j;
+    //char *  pch = 0;
+    int pch = 0;
+    int pcw = 0;
+    int tmppcw = -1;
+	int m_cnt = 60;
+	int cnt = m_cnt;
+
+	std::string s;
+
+	p0 = (paParams) -> pwstrVal;
+    
+	m_cmd = L"" + p0;
+	//res = send_data();
+	m_ans = (L"");
+	m_err = 0;
+
+	l = m_cmd.length();
+	//if (l>255) return return_error(9); //to long command
+	if (l>255) return false; //to long command
+
+	for(i=0;i<l;i++) //ukrainian i problem
+	{
+		if (m_cmd[i]==L'і') m_cmd[i]=L'i';
+		if (m_cmd[i]==L'І') m_cmd[i]=L'I';
+	}
+
+	s = wstrtostr(m_cmd);
+	l = s.length();
+
+	//if (l > 255) return return_error(9); //to long command
+	//if (!m_isOpen) return return_error(1);
+	if (l > 255) return false; //to long command
+	if (!m_ComPort.IsOpen()) return false;
+
+	OUTBUFFER[0] = (char)253;
+	memcpy(OUTBUFFER + 1, s.c_str(), l);
+	OUTBUFFER[l+1] = l + 1;
+	OUTBUFFER[l+2] = (char)254;
+
+	if (m_loging) write_log(OUTBUFFER, l+3, 'c');
+
+	bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
+    //if (!bStatus ) return return_error(5); //error while data send
+    if (!bStatus ) return false; //error while data send
+	
+	total_bytes_read = 0;
+	for (i=0; i<cnt && !pch; i++){
+		//Sleep(2);
+		
+		//GetCommModemStatus(hComm, &ModemStat);
+		//if ((ModemStat && MS_CTS_ON)==0)
+		//{
+		//	return return_error(6);
+		//}
+
+		bytes_read = 0;
+		bStatus = ReadFile(hComm, &SMBUFFER, 50, &bytes_read, NULL);
+		
+		//if (!bStatus) return return_error(6); //error while data recieve
+		if (!bStatus) return false; //error while data recieve
+		
+		if (bytes_read>0)
+		{
+			memcpy(INBUFFER+total_bytes_read, SMBUFFER, bytes_read);
+			total_bytes_read += bytes_read;
+			INBUFFER[total_bytes_read] = 0;
+			//pch = strstr(INBUFFER, "READY");
+			pch = subst(INBUFFER, total_bytes_read, "READY", 5);
+
+			pcw = subst(INBUFFER, total_bytes_read, "WRK", 3);
+			if (pcw>0 && pcw!=tmppcw) 
+			{
+				cnt = cnt + m_cnt;
+				tmppcw = pcw;
+			}
+
+			//s = INBUFFER;
+			//s.resize(total_bytes_read);
+			//fnd = s.find("READY");
+
+		}
+		//if (m_loging) 
+		//{
+		//	sprintf(TMPBUFFER,"%4d %4d %4d %d ZZ", i, bytes_read, total_bytes_read, pch);
+		//	write_log(TMPBUFFER, 35, 'w');
+		//	write_log(SMBUFFER, bytes_read, 'z');
+		//}
+	}
+
+	//Sleep(10);
+
+	s = INBUFFER;
+	s.resize(total_bytes_read);
+	m_ans = strtowstr(s);
+
+	if (m_loging) 
+	{
+		sprintf(TMPBUFFER,"%4d %4d %4d", i, total_bytes_read, cnt);
+		write_log(TMPBUFFER, 14, 't');
+		if (total_bytes_read > 0) 
+		{
+			write_log(INBUFFER, total_bytes_read, 'a');
+		}
+	}
+
+	if (pch == 0) 
+	{
+		//return return_error(10); //no ready from maria
+		return false; //no ready from maria
+	}
+
+	if (total_bytes_read == 0) 
+	{
+		//return return_error(7); //no answer from maria
+		return false; //no answer from maria
+	}
+
+
+	//m_err_cnt = 0;
+	////for (i=59;i>0;i--)
+	//for (j = 0; j < 67; j++) 
+	//{
+	//	l = wcslen(maria_Errors[j]);
+	//	sprintf(TMPBUFFER,"%ws", maria_Errors[j]);
+	//	pch = subst(INBUFFER, total_bytes_read, TMPBUFFER, l);
+	//	if (pch > 0)
+	//	{
+	//		err_arr[m_err_cnt] = j+11;
+	//		m_err_cnt++;
+	//	}
+	//}
+
+	//if (m_err_cnt>0) return return_error(err_arr[0]);
+	
+
+    TV_VT(pvarRetValue) = VTYPE_UI1;
+	TV_UI1(pvarRetValue) = res;
+
+	return true; 
+}
+
+uint8_t CAddInNative::InitMaria(void)
+{
+
+
+    char	INBUFFER[500];
+    //char	ZZBUFFER[500];
+    char	OUTBUFFER[255];
+	char	TMPBUFFER[50];
+    char	SMBUFFER[500];
+    DWORD        bytes_read    = 0;    // Number of bytes read from port
+    DWORD        total_bytes_read    = 0;    
+    DWORD        bytes_written = 0;    // Number of bytes written to the port
+	int		bStatus;
+	DWORD	dwStatus;
+	TCHAR	cmdU = 'U';
+    //char *  pch = 0;
+	int		pch = 0;
+	int		i,l;
+    int pcw = 0;
+    int tmppcw = -1;
+	int m_cnt = 60; //!!!!
+	int cnt = m_cnt;
+
+	std::string s;
+
+
+	m_cmd = (L"");
+	m_ans = (L"");
+	m_err = 0;
+
+
+	//cmdU = (char)253;
+	Sleep(200);
+
+	bStatus = WriteFile(hComm, &cmdU, 1, &bytes_written, NULL);
+    if (!bStatus )
+    {
+		CAddInNative::ClosePort();
+		//return return_error(5); //error while data send
+		return 5; //error while data send
+    }
+	Sleep(50);
+	
+	//cmdU = 'U';
+	bStatus = WriteFile(hComm, &cmdU, 1, &bytes_written, NULL);
+    if (!bStatus )
+    {
+		CAddInNative::ClosePort();
+		//return return_error(5); //error while data send
+		return 5; //error while data send
+    }
+	Sleep(50);
+	
+	total_bytes_read = 0;
+	for (i=0; i<cnt && !pch; i++){
+		//Sleep(2);
+		bytes_read = 0;
+		bStatus = ReadFile(hComm, &SMBUFFER, 10, &bytes_read, NULL);
+		if (!bStatus)
+		{
+			CAddInNative::ClosePort();
+			//return return_error(6); //error while data recieve
+			return 6; //error while data recieve
+		}
+		if (bytes_read > 0){
+			memcpy(INBUFFER + total_bytes_read, SMBUFFER, bytes_read);
+			total_bytes_read = total_bytes_read+bytes_read;
+			INBUFFER[total_bytes_read] = 0;
+			//pch = strstr(INBUFFER, "READY");
+			pch = subst(INBUFFER, total_bytes_read, "READY", 5);
+
+			pcw = subst(INBUFFER, total_bytes_read, "WRK", 3);
+			if (pcw>0 && pcw!=tmppcw) 
+			{
+				cnt = cnt + m_cnt;
+				tmppcw = pcw;
+			}
+		}
+	}
+	Sleep(20);
+	
+	s = INBUFFER;
+	s.resize(total_bytes_read);
+	m_ans = strtowstr(s);
+
+	if (m_loging) 
+	{
+		sprintf(TMPBUFFER,"%4d %4d", i, total_bytes_read);
+		write_log(TMPBUFFER, 9, 't');
+		if (total_bytes_read > 0)
+		{
+			write_log(INBUFFER, total_bytes_read, 'u');
+		}
+	}
+
+	if (pch == 0) 
+	{
+	 	CAddInNative::ClosePort();
+		//return return_error(10); //no ready from maria
+		return 10; //no ready from maria
+	}
+
+	if (total_bytes_read == 0) 
+	{
+	 	CAddInNative::ClosePort();
+		//return return_error(7); //no answer from maria
+		return 7; //no answer from maria
+	}
+
+	m_cmd = (L"SYNC");
+	s = wstrtostr(m_cmd);
+	l = s.length();
+
+	OUTBUFFER[0] = (char)253;
+	memcpy(OUTBUFFER + 1, s.c_str(), l);
+	OUTBUFFER[l+1] = l + 1;
+	OUTBUFFER[l+2] = (char)254;
+
+	if (m_loging) write_log(OUTBUFFER, l+3, 'c');
+
+	bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
+    //if (!bStatus ) return return_error(5); //error while data send
+    if (!bStatus ) return 5; //error while data send
+	
+	pch = 0;
+	total_bytes_read = 0;
+	for (i=0; i<cnt && !pch; i++){
+		//Sleep(2);
+		bytes_read = 0;
+		bStatus = ReadFile(hComm, &SMBUFFER, 10, &bytes_read, NULL);
+		
+		if (!bStatus) 
+		{
+			CAddInNative::ClosePort();
+			//return return_error(6); //error while data recieve
+			return 6; //error while data recieve
+		}
+
+		if (bytes_read>0)
+		{
+			memcpy(INBUFFER+total_bytes_read, SMBUFFER, bytes_read);
+			total_bytes_read += bytes_read;
+			INBUFFER[total_bytes_read] = 0;
+			//pch = strstr(INBUFFER, "READY");
+			pch = subst(INBUFFER, total_bytes_read, "READY", 5);
+
+			pcw = subst(INBUFFER, total_bytes_read, "WRK", 3);
+			if (pcw>0 && pcw>tmppcw) 
+			{
+				cnt = cnt + m_cnt;
+				tmppcw = pcw;
+			}
+
+		}
+	}
+
+	s = INBUFFER;
+	s.resize(total_bytes_read);
+	m_ans = strtowstr(s);
+
+	if (m_loging) 
+	{
+		sprintf(TMPBUFFER,"%4d %4d %4d", i, total_bytes_read, cnt);
+		write_log(TMPBUFFER, 14, 't');
+		if (total_bytes_read > 0)
+		{
+			write_log(INBUFFER, total_bytes_read, 'a');
+		}
+	}
+
+	if (pch == 0) 
+	{
+	 	CAddInNative::ClosePort();
+		//return return_error(10); //no ready from maria
+		return 10; //no ready from maria
+	}
+
+	if (total_bytes_read == 0) 
+	{
+	 	CAddInNative::ClosePort();
+		//return return_error(7); //no answer from maria
+		return 7; //no answer from maria
+	}
+
+	return 0;
+
+}
+
+
 std::wstring CAddInNative::ToHEX(std::wstring s){
 	std::string tmps, ress;
 	tmps = wstrtostr(s);
@@ -1150,7 +1473,7 @@ int CAddInNative::Recieve(void)
 {
 	char	INBUFFER[1024];
 	DWORD   bytes_read = 0;
-	int		bStatus;
+	//int		bStatus;
 
 	std::string s;
 
@@ -1158,12 +1481,15 @@ int CAddInNative::Recieve(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
-	if (!bStatus)
-	{
-		m_err = -1;
-		return -1; //error while data recieve
-	}
+	//bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
+	//if (!bStatus)
+	//{
+	//	m_err = -1;
+	//	return -1; //error while data recieve
+	//}
+	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
+	m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) return m_err;
 
 	write_log(INBUFFER, bytes_read, 'r');
 	s = INBUFFER;
@@ -1179,7 +1505,7 @@ int CAddInNative::SendHex(void)
 	char	OUTBUFFER[256];
 	DWORD   bytes_written = 0;
 
-	int		bStatus;
+	//int		bStatus;
 	uint8_t l;
 	//char ss[50];
 
@@ -1207,12 +1533,15 @@ int CAddInNative::SendHex(void)
 	OUTBUFFER[l] = 0;
 
 
-	bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
-	if (!bStatus)
-	{
-		m_err = -2;
-		return -2; //error while data send
-	}
+	//bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
+	//if (!bStatus)
+	//{
+	//	m_err = -2;
+	//	return -2; //error while data send
+	//}
+	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) return m_err;
 
 	return (int) bytes_written;
 }
@@ -1221,7 +1550,7 @@ int CAddInNative::RecieveHex(void)
 {
 	char	INBUFFER[1024];
 	DWORD   bytes_read = 0;
-	int		bStatus;
+	//int		bStatus;
 
 	std::string s;
 
@@ -1229,12 +1558,13 @@ int CAddInNative::RecieveHex(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
-	if (!bStatus)
-	{
-		m_err = -1;
-		return -1; //error while data recieve
-	}
+	//bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
+	//if (!bStatus)
+	//{
+	//	m_err = -1;
+	//	return -1; //error while data recieve
+	//}
+	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
 
 	s = byte_2_str(INBUFFER, bytes_read);
 	m_ans.assign(s.begin(), s.end());
