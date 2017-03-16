@@ -23,14 +23,15 @@ static wchar_t *g_PropNames[] = {L"IsOpen", L"Port", L"Baud", L"ByteSize", L"Par
 								 L"Command", L"Answer", L"Error", L"Loging"};
 static wchar_t *g_MethodNames[] = {L"Open", L"Close", L"Send", L"Receive", L"Delay", L"SendIKS", 
 								   L"toHEX", L"StartTimer", L"StopTimer", L"SendHex", L"ReceiveHex", 
-								   L"fromHEX", L"Version", L"Test", L"InitMaria", L"SendMaria", L"StartPollACS"};
+								   L"fromHEX", L"Version", L"Test", L"InitMaria", L"SendMaria", L"StartPollACS",
+								   L"GetWeight"};
 
 static wchar_t *g_PropNamesRu[] = {L"Открыт", L"Порт", L"Скорость", L"Байт", L"Четность", L"СтопБит", 
 								   L"Команда", L"Ответ", L"Ошибка", L"Логирование"};
 static wchar_t *g_MethodNamesRu[] = {L"Открыть", L"Закрыть", L"Отправить", L"Получить", L"Задержка", 
 									 L"ОтправитьИКС", L"в16", L"СтартТаймер", L"СтопТаймер", L"Отправить16", 
 									 L"Получить16", L"из16", L"ПолучитьНомерВерсии", L"ТестУстройства", 
-									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС"};
+									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС", L"ПолучитьВес"};
 
 static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
 static IAddInDefBase *pAsyncEvent = NULL;
@@ -114,7 +115,9 @@ CAddInNative::CAddInNative()
 {
     m_iMemory = 0;
     m_iConnect = 0;
+	
 	tst = this;
+	m_loging = false;
 }
 //---------------------------------------------------------------------------//
 CAddInNative::~CAddInNative()
@@ -511,7 +514,8 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
     case eMethFromHex:
     case eMethVersion:
     case eMethTest:
-        return true;
+    case eMethGetWeightACS:        
+		return true;
     default:
         return false;
     }
@@ -684,6 +688,12 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 
 		ret = true;
 		break;
+	case eMethGetWeightACS:
+		res = CAddInNative::GetWeightACS();
+		tmpwstr = m_ans.c_str();
+		wstring_to_p(tmpwstr, pvarRetValue);
+		ret = true;
+		break;
 
 	}
     return ret; 
@@ -701,7 +711,7 @@ VOID CALLBACK MyTimerProc(
     if (!pAsyncEvent)
         return;
 
-    wchar_t *who = L"ComponentNative", *what = L"Timer";
+    wchar_t *who = L"rs232", *what = L"Timer";
 
     wchar_t *wstime = new wchar_t[TIME_LEN];
     if (wstime)
@@ -723,16 +733,16 @@ VOID CALLBACK ACSPollProc(
     if (!pAsyncEvent)
         return;
 
-    wchar_t *who = L"ASC", *what = L"Weight";
+    wchar_t *who = L"rs232", *what = L"Weight";
 
-	tst->Recieve();
+	tst->GetWeightACS();
 
-	std::string::size_type found = tst->m_ans.find_last_of(L"\x03");
-	if (found!=std::string::npos)
-		tst->m_ans = tst->m_ans.substr(0,found);
-	found = tst->m_ans.find_last_of(L"\x02");
-	if (found!=std::string::npos)
-		tst->m_ans = tst->m_ans.substr(found+1);
+	//std::string::size_type found = tst->m_ans.find_last_of(L"\x03");
+	//if (found!=std::string::npos)
+	//	tst->m_ans = tst->m_ans.substr(0,found);
+	//found = tst->m_ans.find_last_of(L"\x02");
+	//if (found!=std::string::npos)
+	//	tst->m_ans = tst->m_ans.substr(found+1);
 
 	wchar_t* wc = (wchar_t*)tst->m_ans.c_str();    
     if (wc)
@@ -1443,6 +1453,23 @@ uint8_t CAddInNative::InitMaria(void)
 
 	return 0;
 
+}
+
+int CAddInNative::GetWeightACS(void){
+	CAddInNative::Recieve();
+	if (m_ans == L"")
+		return 0;
+
+	//Delay(20);
+	//CAddInNative::Recieve();
+	std::string::size_type found_end = m_ans.find_last_of(L"\x03");
+	if (found_end!=std::string::npos)
+		m_ans = m_ans.substr(0, found_end);
+	std::string::size_type found_begin = m_ans.find_last_of(L"\x02");
+	if (found_begin!=std::string::npos)
+		m_ans = m_ans.substr(found_begin + 1);
+
+	return 0;
 }
 
 

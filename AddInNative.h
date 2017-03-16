@@ -47,6 +47,7 @@ public:
         eMethInitMaria,
 		eMethSendMaria,
 		eMethStartPollACS,
+		eMethGetWeightACS,
 		eMethLast      // Always last
     };
 
@@ -87,7 +88,7 @@ public:
     // LocaleBase
     virtual void ADDIN_API SetLocale(const WCHAR_T* loc);
 	
-	int CAddInNative::Recieve(void);
+	int CAddInNative::GetWeightACS(void);	
 	std::wstring		m_ans;
 
 private:
@@ -110,6 +111,8 @@ private:
 	std::wstring CAddInNative::ToHEX(std::wstring s);
 	std::wstring CAddInNative::FromHEX(std::wstring s);
 	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
+	int CAddInNative::Recieve(void);
+
 
 
 	// Attributes

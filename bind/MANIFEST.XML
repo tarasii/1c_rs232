@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<bundle xmlns="http://v8.1c.ru/8.2/addin/bundle">
+<component os="Windows" path="AddInNative.dll" type="native" arch="i386" />
+</bundle>
