@@ -862,7 +862,7 @@ uint8_t CAddInNative::OpenPort(tVariant* paParams)
 	if (m_loging) 
 	{
 		dwStatus = GetTempPath(MAX_PATH, lpTempPathBuffer);
-		memcpy(lpTempPathBuffer + dwStatus, TEXT("rs232.log"),14);
+		memcpy(lpTempPathBuffer + dwStatus, TEXT("rs232.log"),9);
 		//uRetVal = GetTempFileName(lpTempPathBuffer, TEXT("maria"), 0, szTempFileName);
 	    hTempFile = CreateFile((LPTSTR) lpTempPathBuffer,  GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);                // no template 
 		dwStatus = SetFilePointer(hTempFile, 0, NULL, FILE_END);
@@ -1456,18 +1456,28 @@ uint8_t CAddInNative::InitMaria(void)
 }
 
 int CAddInNative::GetWeightACS(void){
-	CAddInNative::Recieve();
-	if (m_ans == L"")
-		return 0;
+	std::wstring		tmp;
+	std::string::size_type found_end;
+	std::string::size_type found_begin;
+	int cnt=0;
 
-	//Delay(20);
-	//CAddInNative::Recieve();
-	std::string::size_type found_end = m_ans.find_last_of(L"\x03");
+	m_ans.clear();
+
+	m_ComPort.Reset();
+	while (cnt++ < 2000 && tmp.length() < 60){
+		Delay(50);
+		CAddInNative::Recieve();
+		tmp.append(m_ans);
+	}
+
+	found_end = tmp.find_last_of(L"\x03");
 	if (found_end!=std::string::npos)
-		m_ans = m_ans.substr(0, found_end);
-	std::string::size_type found_begin = m_ans.find_last_of(L"\x02");
+		tmp = tmp.substr(0, found_end);
+	found_begin = tmp.find_last_of(L"\x02");
 	if (found_begin!=std::string::npos)
-		m_ans = m_ans.substr(found_begin + 1);
+		tmp = tmp.substr(found_begin+1);
+
+	m_ans = tmp;
 
 	return 0;
 }
