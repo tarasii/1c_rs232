@@ -48,6 +48,8 @@ public:
 		eMethSendMaria,
 		eMethStartPollACS,
 		eMethGetWeightACS,
+		eMethGetWeightVTA,
+		eMethSetPriceVTA,
 		eMethLast      // Always last
     };
 
@@ -112,7 +114,8 @@ private:
 	std::wstring CAddInNative::FromHEX(std::wstring s);
 	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
 	int CAddInNative::Recieve(void);
-
+	int CAddInNative::GetWeightVTA(void);
+	int CAddInNative::SetPriceVTA(uint16_t price);
 
 
 	// Attributes
@@ -134,6 +137,9 @@ private:
 
 	CPort				m_ComPort;
 
+
 };
+
+
 
 #endif //__ADDINNATIVE_H__

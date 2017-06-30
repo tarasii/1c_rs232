@@ -14,6 +14,8 @@
 #include <wchar.h>
 #include "AddInNative.h"
 #include <string>
+#include <algorithm>
+#include <sstream>
 
 #define TIME_LEN 34
 
@@ -24,14 +26,15 @@ static wchar_t *g_PropNames[] = {L"IsOpen", L"Port", L"Baud", L"ByteSize", L"Par
 static wchar_t *g_MethodNames[] = {L"Open", L"Close", L"Send", L"Receive", L"Delay", L"SendIKS", 
 								   L"toHEX", L"StartTimer", L"StopTimer", L"SendHex", L"ReceiveHex", 
 								   L"fromHEX", L"Version", L"Test", L"InitMaria", L"SendMaria", L"StartPollACS",
-								   L"GetWeight"};
+								   L"GetWeightACS", L"GetWeightVTA", L"SetPriceVTA"};
 
 static wchar_t *g_PropNamesRu[] = {L"Открыт", L"Порт", L"Скорость", L"Байт", L"Четность", L"СтопБит", 
 								   L"Команда", L"Ответ", L"Ошибка", L"Логирование"};
 static wchar_t *g_MethodNamesRu[] = {L"Открыть", L"Закрыть", L"Отправить", L"Получить", L"Задержка", 
 									 L"ОтправитьИКС", L"в16", L"СтартТаймер", L"СтопТаймер", L"Отправить16", 
 									 L"Получить16", L"из16", L"ПолучитьНомерВерсии", L"ТестУстройства", 
-									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС", L"ПолучитьВес"};
+									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС", L"ПолучитьВесАЦС", 
+									 L"ПолучитьВесВТА", L"УстановитьЦенуВТА"};
 
 static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
 static IAddInDefBase *pAsyncEvent = NULL;
@@ -61,6 +64,14 @@ std::string wstrtostr(const std::wstring &wstr);
 std::string byte_2_str(char* bytes, int size);
 int str_2_byte(char* bytes, std::string instr, int size);
 int subst( char* str, int ln, char* substr, int subln);
+
+template<class T>
+std::string toString(const T &value) {
+    std::ostringstream os;
+    os << value;
+    return os.str();
+}
+
 
 //---------------------------------------------------------------------------//
 long GetClassObject(const WCHAR_T* wsName, IComponentBase** pInterface)
@@ -401,6 +412,7 @@ long CAddInNative::GetNParams(const long lMethodNum)
 	case eMethToHex:
 	case eMethFromHex:
 	case eMethSendMaria:
+	case eMethSetPriceVTA:
 		return 1;
     default:
         return 0;
@@ -474,12 +486,22 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
 		default:
 			return false;
 		}
+        break;	
 	case eMethStartTimer:
 		switch (lParamNum)
 		{
 		case 0:
 			TV_VT(pvarParamDefValue) = VTYPE_UI4;
 			TV_UI4(pvarParamDefValue) = 1000;
+			return true;
+		}
+        break;
+	case eMethSetPriceVTA:
+		switch (lParamNum)
+		{
+		case 0:
+			TV_VT(pvarParamDefValue) = VTYPE_UI8;
+			TV_UI8(pvarParamDefValue) = 0;
 			return true;
 		}
         break;
@@ -515,6 +537,7 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
     case eMethVersion:
     case eMethTest:
     case eMethGetWeightACS:        
+    case eMethGetWeightVTA:        
 		return true;
     default:
         return false;
@@ -527,6 +550,8 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
                     tVariant* paParams, const long lSizeArray)
 {
 	uint32_t dt;
+	uint16_t price;
+
 	switch(lMethodNum)
     { 
     case eMethClose:
@@ -557,7 +582,11 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
         m_uiTimer = ::SetTimer(NULL,0,100,(TIMERPROC)ACSPollProc);
         //pAsyncEvent = NULL;
         break;
-
+    case eMethSetPriceVTA:
+		price = TV_UI8(paParams);
+		CAddInNative::SetPriceVTA(price);
+		
+		break;
     default:
         return false;
     }
@@ -695,6 +724,12 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		ret = true;
 		break;
 
+	case eMethGetWeightVTA:
+		res = CAddInNative::GetWeightVTA();
+		tmpwstr = m_ans.c_str();
+		wstring_to_p(tmpwstr, pvarRetValue);
+		ret = true;
+		break;
 	}
     return ret; 
 }
@@ -862,7 +897,7 @@ uint8_t CAddInNative::OpenPort(tVariant* paParams)
 	if (m_loging) 
 	{
 		dwStatus = GetTempPath(MAX_PATH, lpTempPathBuffer);
-		memcpy(lpTempPathBuffer + dwStatus, TEXT("rs232.log"),9);
+		memcpy(lpTempPathBuffer + dwStatus, TEXT("rs232.log"),18);
 		//uRetVal = GetTempFileName(lpTempPathBuffer, TEXT("maria"), 0, szTempFileName);
 	    hTempFile = CreateFile((LPTSTR) lpTempPathBuffer,  GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);                // no template 
 		dwStatus = SetFilePointer(hTempFile, 0, NULL, FILE_END);
@@ -966,10 +1001,12 @@ int CAddInNative::Send(void)
 	//}
 
 	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	write_log(OUTBUFFER, l, 's');		
+	
 	m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return m_err;
 
-	write_log(OUTBUFFER, l, 's');	
+
 	return (int) bytes_written;
 }
 
@@ -1483,6 +1520,66 @@ int CAddInNative::GetWeightACS(void){
 }
 
 
+int CAddInNative::GetWeightVTA(void){
+
+	int ret;
+	std::wstring tmp;
+	uint16_t cnt;
+
+	m_ans.clear();
+	m_cmd = L"000003";
+	ret = CAddInNative::SendHex();
+	
+	Delay(120);
+
+	ret = CAddInNative::RecieveHex();
+	std::reverse(m_ans.begin(), m_ans.end());
+
+	for (cnt=0; cnt<m_ans.length(); cnt+=2){
+		//tmp.append(m_cmd[cnt]);
+		tmp.append(1, m_ans[cnt]);
+	}
+
+	m_ans = tmp;
+
+	return 0;
+}
+
+
+int CAddInNative::SetPriceVTA(uint16_t price){
+	uint8_t cnt=0, len;
+	int ret;
+
+	m_cmd = strtowstr(toString(price));
+
+	len = m_cmd.length();
+	if (len >6)
+	{
+		m_cmd.resize(6);
+	}
+	else if (len<6)
+	{
+		m_cmd.insert(0, 6 - len, '0');
+	}
+
+	std::reverse(m_cmd.begin(), m_cmd.end());
+
+	len = m_cmd.length();
+	for (cnt=0;cnt<len;cnt++)
+	{
+		m_cmd.insert(cnt*2, L"0");
+	}
+	m_cmd.insert(0, L"000002");
+
+	ret = CAddInNative::SendHex();
+
+	Delay(40);
+
+	return ret;
+}
+
+
+
 std::wstring CAddInNative::ToHEX(std::wstring s){
 	std::string tmps, ress;
 	tmps = wstrtostr(s);
@@ -1525,10 +1622,11 @@ int CAddInNative::Recieve(void)
 	//	return -1; //error while data recieve
 	//}
 	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
+	write_log(INBUFFER, bytes_read, 'r');
+	
 	m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return m_err;
 
-	write_log(INBUFFER, bytes_read, 'r');
 	s = INBUFFER;
 
 	s.resize(bytes_read);
@@ -1577,6 +1675,9 @@ int CAddInNative::SendHex(void)
 	//	return -2; //error while data send
 	//}
 	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+
+	write_log(OUTBUFFER, l, 's');	
+
 	m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return m_err;
 
@@ -1602,6 +1703,8 @@ int CAddInNative::RecieveHex(void)
 	//	return -1; //error while data recieve
 	//}
 	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
+
+	write_log(INBUFFER, bytes_read, 'r');
 
 	s = byte_2_str(INBUFFER, bytes_read);
 	m_ans.assign(s.begin(), s.end());
