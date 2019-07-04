@@ -115,7 +115,7 @@ private:
 	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
 	int CAddInNative::Recieve(void);
 	int CAddInNative::GetWeightVTA(void);
-	int CAddInNative::SetPriceVTA(uint16_t price);
+	int CAddInNative::SetPriceVTA(uint32_t price);
 
 
 	// Attributes

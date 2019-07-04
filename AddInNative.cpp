@@ -550,7 +550,7 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
                     tVariant* paParams, const long lSizeArray)
 {
 	uint32_t dt;
-	uint16_t price;
+	uint32_t price;
 
 	switch(lMethodNum)
     { 
@@ -1546,7 +1546,7 @@ int CAddInNative::GetWeightVTA(void){
 }
 
 
-int CAddInNative::SetPriceVTA(uint16_t price){
+int CAddInNative::SetPriceVTA(uint32_t price){
 	uint8_t cnt=0, len;
 	int ret;
 
