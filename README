@@ -29,7 +29,52 @@ wstr Command - last command to port;
 wstr Answer  - answer from port;
 int Error    - last error code
 
+VTA:
+GetWeightVTA() - get weight
+SetPriceVTA(Price) - set price
+
+Maria:
+InitMaria() - Init rinter
+SendMaria(cmd) - Send command "cmd"
+    examples:
+	REZ = COMP.SendMaria("NREP"); //ZReport();
+	REZ = COMP.SendMaria("ZREP"); //XReport();
+	REZ = COMP.SendMaria("DBEG1"); //OpenDoc(Ложь);
+	REZ = COMP.SendMaria("TEXT0001234567890 a1234567890 a1234567890 b1234567890"); 
+	REZ = COMP.SendMaria("CTXT"); //ClearComment();
+	REZ = COMP.SendMaria("PRTX"); //PrintDoc();
+	REZ = COMP.SendMaria("NULL"); //НулевойЧек();
+	REZ = COMP.SendMaria("KASS"); //OpenDrawer();
+	REZ = COMP.SendMaria("DISp23      2900"); //Display("      2900");
+	REZ = COMP.SendMaria("GETD");
+	REZ = COMP.SendMaria("MDMD260100");
+
+
+ACS:
+StartPollACS() - start threed for getweight 
+GetWeightACS() - get weight
+
+LED8N:
+SendHex("1B5141313233340D") - send 1234 to display
+SendHex("1B7331") - Turn on first led
+
+IKS:
+SendIKS(cmd, data) - send command to IKS
+    examples:
+        REZ = COMP.SendIKS(15,"") - Cancell check
+        REZ = COMP.SendIKS(20,"03000001000430303030") - Close check 03 - sell type, 00000100 - sum, 30303030 - avtorization code  
+        REZ = COMP.SendIKS(42, "00") - Z report
+
 1C: Examples:
 
 InfoBase - modem demo;
-InfoBaseMA - Maria 301 demo.
+InfoBaseMaria - Maria 301-307 fiscal printer demo.
+InfoBaseIKS - IKS fiscal printer demo.
+ibAClas - AClas weight demo
+ibACS30A - ACS30A weight demo
+ibVTA - VTA weight demo
+ibLED8N - LED8N display demo
+
+
+
+
