@@ -25,16 +25,21 @@ static wchar_t *g_PropNames[] = {L"IsOpen", L"Port", L"Baud", L"ByteSize", L"Par
 								 L"Command", L"Answer", L"Error", L"Loging"};
 static wchar_t *g_MethodNames[] = {L"Open", L"Close", L"Send", L"Receive", L"Delay", L"SendIKS", 
 								   L"toHEX", L"StartTimer", L"StopTimer", L"SendHex", L"ReceiveHex", 
-								   L"fromHEX", L"Version", L"Test", L"InitMaria", L"SendMaria", L"StartPollACS",
-								   L"GetWeightACS", L"GetWeightVTA", L"SetPriceVTA"};
+								   L"fromHEX", L"Version", L"Test", 
+								   L"InitMaria", L"SendMaria", 
+								   L"StartPollACS", L"GetWeightACS", 
+								   L"GetWeightVTA", L"SetPriceVTA", 
+								   L"SetPriceLed8N", L"SetStatusLed8N"};
 
 static wchar_t *g_PropNamesRu[] = {L"Открыт", L"Порт", L"Скорость", L"Байт", L"Четность", L"СтопБит", 
 								   L"Команда", L"Ответ", L"Ошибка", L"Логирование"};
 static wchar_t *g_MethodNamesRu[] = {L"Открыть", L"Закрыть", L"Отправить", L"Получить", L"Задержка", 
 									 L"ОтправитьИКС", L"в16", L"СтартТаймер", L"СтопТаймер", L"Отправить16", 
 									 L"Получить16", L"из16", L"ПолучитьНомерВерсии", L"ТестУстройства", 
-									 L"ИниМария", L"ОтправитьМария", L"ОпросВесыАЦС", L"ПолучитьВесАЦС", 
-									 L"ПолучитьВесВТА", L"УстановитьЦенуВТА"};
+									 L"ИниМария", L"ОтправитьМария", 
+									 L"ОпросВесыАЦС", L"ПолучитьВесАЦС", 
+									 L"ПолучитьВесВТА", L"УстановитьЦенуВТА", 
+									 L"УстановитьЦенуLed8N", L"УстановитьСтатусLed8N"};
 
 static const wchar_t g_kClassNames[] = L"CAddInNative"; //"|OtherClass1|OtherClass2";
 static IAddInDefBase *pAsyncEvent = NULL;
@@ -414,6 +419,10 @@ long CAddInNative::GetNParams(const long lMethodNum)
 	case eMethSendMaria:
 	case eMethSetPriceVTA:
 		return 1;
+	case eMethSetPriceLed8N:
+		return 1;
+	case eMethSetStatusLed8N:
+		return 1;
     default:
         return 0;
     }
@@ -513,7 +522,6 @@ bool CAddInNative::GetParamDefValue(const long lMethodNum, const long lParamNum,
     case eMethSendHex:
     case eMethRecieveHex:
     case eMethStopTimer:
-       // There are no parameter values by default 
     default:
         return false;
     }
@@ -549,17 +557,17 @@ bool CAddInNative::HasRetVal(const long lMethodNum)
 bool CAddInNative::CallAsProc(const long lMethodNum,
                     tVariant* paParams, const long lSizeArray)
 {
-	uint32_t dt;
-	uint32_t price;
-
 	switch(lMethodNum)
     { 
     case eMethClose:
 		CAddInNative::ClosePort();
         break;
     case eMethDelay:
-		dt = TV_UI4(paParams);
-		CAddInNative::Delay(dt);
+		{
+			uint32_t dt;
+			dt = TV_UI4(paParams);
+			CAddInNative::Delay(dt);
+		}
         break;
     case eMethStartTimer:
 		if (!lSizeArray || TV_VT(paParams) != VTYPE_I4 || TV_I4(paParams) <= 0)
@@ -583,9 +591,24 @@ bool CAddInNative::CallAsProc(const long lMethodNum,
         //pAsyncEvent = NULL;
         break;
     case eMethSetPriceVTA:
-		price = TV_UI8(paParams);
-		CAddInNative::SetPriceVTA(price);
-		
+		{
+			uint64_t  price = TV_UI8(paParams);
+			CAddInNative::SetPriceVTA(price);
+		}
+		break;
+    case eMethSetPriceLed8N:
+		{
+			std::wstring p0;
+			p0 = (paParams) -> pwstrVal;
+			CAddInNative::SetPriceLed8N(p0);
+		}
+		break;
+    case eMethSetStatusLed8N:
+		{
+			std::wstring p0;
+			p0 = (paParams) -> pwstrVal;
+			CAddInNative::SetStatusLed8N(p0);
+		}
 		break;
     default:
         return false;
@@ -648,7 +671,11 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		break;
 
 	case eMethSendMaria:
-		ret = CAddInNative::SendMaria(pvarRetValue, paParams, lSizeArray);
+		res = CAddInNative::SendMaria(paParams, lSizeArray);
+
+		TV_VT(pvarRetValue) = VTYPE_UI1;
+		TV_UI1(pvarRetValue) = res;
+		ret = true;
 		break;
 
 	case eMethRecieve:
@@ -958,54 +985,26 @@ void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type)
 
 int CAddInNative::Send(void)
 {
-	char	OUTBUFFER[256];
+	char	*OUTBUFFER;
 	DWORD   bytes_written = 0;
 
-	//int		bStatus;
 	uint8_t l;
-	//char ss[50];
 
 	std::string s;
 
 	m_err = 0;
 
-	l = m_cmd.length();
-	if (l > 256)
-	{
-		m_err = -1;
-		return -1; //to long command
-	}
-
 	s = wstrtostr(m_cmd);
 	l = s.length();
-	if (l > 256)
-	{
-		m_err = -1;
-		return -1; //to long command
-	}
 
+	OUTBUFFER = (char *) malloc(l * sizeof(char));
 	memcpy(OUTBUFFER, s.c_str(), l);
-	//OUTBUFFER[l] = (char)0;
-
-	//s = OUTBUFFER;
-	//sprintf(ss, "=%d =%d =%d =%d =%d", OUTBUFFER[0], OUTBUFFER[1], OUTBUFFER[2], OUTBUFFER[3], l);
-	//s = ss;
-	//s.resize(l+1);
-	//m_cmd.assign(s.begin(), s.end());
-
-	//bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
-	//if (!bStatus)
-	//{
-	//	m_err = -2;
-	//	return -2; //error while data send
-	//}
 
 	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
 	write_log(OUTBUFFER, l, 's');		
 	
 	m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return m_err;
-
 
 	return (int) bytes_written;
 }
@@ -1147,43 +1146,17 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	return (int) bytes_read;
 }
 
-bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray)
+int CAddInNative::SendMariaCommand()
 {
-	int res = 1;
-	std::wstring p0;
 
-	char	SMBUFFER[50];
-    char	INBUFFER[500];
     char	OUTBUFFER[255];
-	char	TMPBUFFER[50];
-
-    DWORD   bytes_read		 = 0;
-    DWORD   total_bytes_read = 0;
-    DWORD   bytes_written	 = 0;
-	
-	int		bStatus;
-	uint16_t i,l,j;
-    //char *  pch = 0;
-    int pch = 0;
-    int pcw = 0;
-    int tmppcw = -1;
-	int m_cnt = 60;
-	int cnt = m_cnt;
-
 	std::string s;
 
-	p0 = (paParams) -> pwstrVal;
-    
-	m_cmd = L"" + p0;
-	//res = send_data();
 	m_ans = (L"");
 	m_err = 0;
 
-	l = m_cmd.length();
-	//if (l>255) return return_error(9); //to long command
-	if (l>255) return false; //to long command
-
-	for(i=0;i<l;i++) //ukrainian i problem
+	int l = m_cmd.length();
+	for(int i=0;i<l;i++) //ukrainian i problem
 	{
 		if (m_cmd[i]==L'і') m_cmd[i]=L'i';
 		if (m_cmd[i]==L'І') m_cmd[i]=L'I';
@@ -1194,8 +1167,8 @@ bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const l
 
 	//if (l > 255) return return_error(9); //to long command
 	//if (!m_isOpen) return return_error(1);
-	if (l > 255) return false; //to long command
-	if (!m_ComPort.IsOpen()) return false;
+	if (l + 3 > 255) return 9; //to long command
+	if (!m_ComPort.IsOpen()) return 1;
 
 	OUTBUFFER[0] = (char)253;
 	memcpy(OUTBUFFER + 1, s.c_str(), l);
@@ -1204,25 +1177,55 @@ bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const l
 
 	if (m_loging) write_log(OUTBUFFER, l+3, 'c');
 
-	bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
+	//bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
     //if (!bStatus ) return return_error(5); //error while data send
-    if (!bStatus ) return false; //error while data send
-	
+	m_ComPort.SendBuf(&OUTBUFFER, l+3);
+	//m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) return 5; //error while data send
+
+	return 0;
+
+}
+
+int CAddInNative::GetMariaAnswer()
+{
+	int res = 1;
+
+	char	SMBUFFER[50];
+    char	INBUFFER[500];
+ 	char	TMPBUFFER[50];
+
+    DWORD   bytes_read		 = 0;
+    DWORD   total_bytes_read = 0;
+ 	
+	uint16_t i;
+    //char *  pch = 0;
+    int pch = 0;
+    int pcw = 0;
+    int tmppcw = -1;
+	int m_cnt = 60;
+	int cnt = m_cnt;
+
+	std::string s;
+
+	m_ans = (L"");
+	m_err = 0;
+
+
 	total_bytes_read = 0;
 	for (i=0; i<cnt && !pch; i++){
 		//Sleep(2);
 		
-		//GetCommModemStatus(hComm, &ModemStat);
-		//if ((ModemStat && MS_CTS_ON)==0)
-		//{
-		//	return return_error(6);
-		//}
 
-		bytes_read = 0;
-		bStatus = ReadFile(hComm, &SMBUFFER, 50, &bytes_read, NULL);
-		
+		//bytes_read = 0;
+		//bStatus = ReadFile(hComm, &SMBUFFER, 50, &bytes_read, NULL);
 		//if (!bStatus) return return_error(6); //error while data recieve
-		if (!bStatus) return false; //error while data recieve
+		//if (!bStatus) return false; //error while data recieve
+
+		bytes_read = m_ComPort.ReadBuf(&SMBUFFER, 50);
+		m_err = -m_ComPort.GetLastError();
+		if (m_err != 0) return 6;
+		
 		
 		if (bytes_read>0)
 		{
@@ -1238,18 +1241,7 @@ bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const l
 				cnt = cnt + m_cnt;
 				tmppcw = pcw;
 			}
-
-			//s = INBUFFER;
-			//s.resize(total_bytes_read);
-			//fnd = s.find("READY");
-
 		}
-		//if (m_loging) 
-		//{
-		//	sprintf(TMPBUFFER,"%4d %4d %4d %d ZZ", i, bytes_read, total_bytes_read, pch);
-		//	write_log(TMPBUFFER, 35, 'w');
-		//	write_log(SMBUFFER, bytes_read, 'z');
-		//}
 	}
 
 	//Sleep(10);
@@ -1271,221 +1263,82 @@ bool CAddInNative::SendMaria(tVariant* pvarRetValue, tVariant* paParams, const l
 	if (pch == 0) 
 	{
 		//return return_error(10); //no ready from maria
-		return false; //no ready from maria
+		return 10; //no ready from maria
 	}
 
 	if (total_bytes_read == 0) 
 	{
 		//return return_error(7); //no answer from maria
-		return false; //no answer from maria
+		return 7; //no answer from maria
 	}
 
+	return 0;
+}
 
-	//m_err_cnt = 0;
-	////for (i=59;i>0;i--)
-	//for (j = 0; j < 67; j++) 
-	//{
-	//	l = wcslen(maria_Errors[j]);
-	//	sprintf(TMPBUFFER,"%ws", maria_Errors[j]);
-	//	pch = subst(INBUFFER, total_bytes_read, TMPBUFFER, l);
-	//	if (pch > 0)
-	//	{
-	//		err_arr[m_err_cnt] = j+11;
-	//		m_err_cnt++;
-	//	}
-	//}
+int CAddInNative::SendMaria(tVariant* paParams, const long lSizeArray)
+{
+	int res = 1;
+	std::wstring p0;
 
-	//if (m_err_cnt>0) return return_error(err_arr[0]);
+	p0 = (paParams) -> pwstrVal;
+    
+	m_cmd = L"" + p0;
+	m_ans = (L"");
+	m_err = 0;
+
+	res = CAddInNative::SendMariaCommand();
+	if (res == 0) res = CAddInNative::GetMariaAnswer();
 	
-
-    TV_VT(pvarRetValue) = VTYPE_UI1;
-	TV_UI1(pvarRetValue) = res;
-
-	return true; 
+	return res; 
 }
 
 uint8_t CAddInNative::InitMaria(void)
 {
+	int res = 1;
 
-
-    char	INBUFFER[500];
-    //char	ZZBUFFER[500];
-    char	OUTBUFFER[255];
-	char	TMPBUFFER[50];
-    char	SMBUFFER[500];
-    DWORD        bytes_read    = 0;    // Number of bytes read from port
-    DWORD        total_bytes_read    = 0;    
-    DWORD        bytes_written = 0;    // Number of bytes written to the port
-	int		bStatus;
-	DWORD	dwStatus;
 	TCHAR	cmdU = 'U';
-    //char *  pch = 0;
-	int		pch = 0;
-	int		i,l;
-    int pcw = 0;
-    int tmppcw = -1;
-	int m_cnt = 60; //!!!!
-	int cnt = m_cnt;
-
-	std::string s;
-
 
 	m_cmd = (L"");
 	m_ans = (L"");
 	m_err = 0;
 
-
 	//cmdU = (char)253;
 	Sleep(200);
 
-	bStatus = WriteFile(hComm, &cmdU, 1, &bytes_written, NULL);
-    if (!bStatus )
-    {
+	m_ComPort.SendBuf(&cmdU, 1);
+	//m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) {
 		CAddInNative::ClosePort();
-		//return return_error(5); //error while data send
-		return 5; //error while data send
-    }
+		return 5;
+	}
 	Sleep(50);
 	
-	//cmdU = 'U';
-	bStatus = WriteFile(hComm, &cmdU, 1, &bytes_written, NULL);
-    if (!bStatus )
-    {
+	m_ComPort.SendBuf(&cmdU, 1);
+	//m_err = -m_ComPort.GetLastError();
+	if (m_err != 0) {
 		CAddInNative::ClosePort();
-		//return return_error(5); //error while data send
-		return 5; //error while data send
-    }
+		return 5;
+	}
 	Sleep(50);
 	
-	total_bytes_read = 0;
-	for (i=0; i<cnt && !pch; i++){
-		//Sleep(2);
-		bytes_read = 0;
-		bStatus = ReadFile(hComm, &SMBUFFER, 10, &bytes_read, NULL);
-		if (!bStatus)
-		{
-			CAddInNative::ClosePort();
-			//return return_error(6); //error while data recieve
-			return 6; //error while data recieve
-		}
-		if (bytes_read > 0){
-			memcpy(INBUFFER + total_bytes_read, SMBUFFER, bytes_read);
-			total_bytes_read = total_bytes_read+bytes_read;
-			INBUFFER[total_bytes_read] = 0;
-			//pch = strstr(INBUFFER, "READY");
-			pch = subst(INBUFFER, total_bytes_read, "READY", 5);
-
-			pcw = subst(INBUFFER, total_bytes_read, "WRK", 3);
-			if (pcw>0 && pcw!=tmppcw) 
-			{
-				cnt = cnt + m_cnt;
-				tmppcw = pcw;
-			}
-		}
-	}
-	Sleep(20);
-	
-	s = INBUFFER;
-	s.resize(total_bytes_read);
-	m_ans = strtowstr(s);
-
-	if (m_loging) 
-	{
-		sprintf(TMPBUFFER,"%4d %4d", i, total_bytes_read);
-		write_log(TMPBUFFER, 9, 't');
-		if (total_bytes_read > 0)
-		{
-			write_log(INBUFFER, total_bytes_read, 'u');
-		}
-	}
-
-	if (pch == 0) 
+    res = CAddInNative::GetMariaAnswer();	
+	if (res != 0) 
 	{
 	 	CAddInNative::ClosePort();
-		//return return_error(10); //no ready from maria
-		return 10; //no ready from maria
+		return res; 
 	}
-
-	if (total_bytes_read == 0) 
-	{
-	 	CAddInNative::ClosePort();
-		//return return_error(7); //no answer from maria
-		return 7; //no answer from maria
-	}
+    Sleep(20);
 
 	m_cmd = (L"SYNC");
-	s = wstrtostr(m_cmd);
-	l = s.length();
-
-	OUTBUFFER[0] = (char)253;
-	memcpy(OUTBUFFER + 1, s.c_str(), l);
-	OUTBUFFER[l+1] = l + 1;
-	OUTBUFFER[l+2] = (char)254;
-
-	if (m_loging) write_log(OUTBUFFER, l+3, 'c');
-
-	bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
-    //if (!bStatus ) return return_error(5); //error while data send
-    if (!bStatus ) return 5; //error while data send
-	
-	pch = 0;
-	total_bytes_read = 0;
-	for (i=0; i<cnt && !pch; i++){
-		//Sleep(2);
-		bytes_read = 0;
-		bStatus = ReadFile(hComm, &SMBUFFER, 10, &bytes_read, NULL);
-		
-		if (!bStatus) 
-		{
-			CAddInNative::ClosePort();
-			//return return_error(6); //error while data recieve
-			return 6; //error while data recieve
-		}
-
-		if (bytes_read>0)
-		{
-			memcpy(INBUFFER+total_bytes_read, SMBUFFER, bytes_read);
-			total_bytes_read += bytes_read;
-			INBUFFER[total_bytes_read] = 0;
-			//pch = strstr(INBUFFER, "READY");
-			pch = subst(INBUFFER, total_bytes_read, "READY", 5);
-
-			pcw = subst(INBUFFER, total_bytes_read, "WRK", 3);
-			if (pcw>0 && pcw>tmppcw) 
-			{
-				cnt = cnt + m_cnt;
-				tmppcw = pcw;
-			}
-
-		}
-	}
-
-	s = INBUFFER;
-	s.resize(total_bytes_read);
-	m_ans = strtowstr(s);
-
-	if (m_loging) 
+	res = CAddInNative::SendMariaCommand();
+	if (res == 0)
 	{
-		sprintf(TMPBUFFER,"%4d %4d %4d", i, total_bytes_read, cnt);
-		write_log(TMPBUFFER, 14, 't');
-		if (total_bytes_read > 0)
-		{
-			write_log(INBUFFER, total_bytes_read, 'a');
-		}
+		res = CAddInNative::GetMariaAnswer();
 	}
-
-	if (pch == 0) 
+	if (res != 0) 
 	{
 	 	CAddInNative::ClosePort();
-		//return return_error(10); //no ready from maria
-		return 10; //no ready from maria
-	}
-
-	if (total_bytes_read == 0) 
-	{
-	 	CAddInNative::ClosePort();
-		//return return_error(7); //no answer from maria
-		return 7; //no answer from maria
+		return res; 
 	}
 
 	return 0;
@@ -1536,7 +1389,6 @@ int CAddInNative::GetWeightVTA(void){
 	std::reverse(m_ans.begin(), m_ans.end());
 
 	for (cnt=0; cnt<m_ans.length(); cnt+=2){
-		//tmp.append(m_cmd[cnt]);
 		tmp.append(1, m_ans[cnt]);
 	}
 
@@ -1546,7 +1398,7 @@ int CAddInNative::GetWeightVTA(void){
 }
 
 
-int CAddInNative::SetPriceVTA(uint32_t price){
+int CAddInNative::SetPriceVTA(uint64_t price){
 	uint8_t cnt=0, len;
 	int ret;
 
@@ -1574,6 +1426,45 @@ int CAddInNative::SetPriceVTA(uint32_t price){
 	ret = CAddInNative::SendHex();
 
 	Delay(40);
+
+	return ret;
+}
+
+int CAddInNative::SetPriceLed8N(std::wstring s){
+	uint8_t cnt=0, len;
+	int ret;
+
+	m_cmd = L"";
+
+	len = s.length();
+	if (len > 8)
+	{
+		s.resize(8);
+	}
+	m_cmd = CAddInNative::ToHEX(s);
+	m_cmd.insert(0, L"1B5141");
+	m_cmd.append(L"0D");
+
+	ret = CAddInNative::SendHex();
+
+	return ret;
+}
+
+int CAddInNative::SetStatusLed8N(std::wstring s){
+	uint8_t cnt=0, len;
+	int ret;
+
+	m_cmd = L"";
+
+	len = s.length();
+	if (len > 1)
+	{
+		s.resize(1);
+	}
+	m_cmd = CAddInNative::ToHEX(s);
+	m_cmd.insert(0, L"1B73");
+
+	ret = CAddInNative::SendHex();
 
 	return ret;
 }
@@ -1607,7 +1498,6 @@ int CAddInNative::Recieve(void)
 {
 	char	INBUFFER[1024];
 	DWORD   bytes_read = 0;
-	//int		bStatus;
 
 	std::string s;
 
@@ -1615,12 +1505,6 @@ int CAddInNative::Recieve(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	//bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
-	//if (!bStatus)
-	//{
-	//	m_err = -1;
-	//	return -1; //error while data recieve
-	//}
 	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
 	write_log(INBUFFER, bytes_read, 'r');
 	
@@ -1664,16 +1548,8 @@ int CAddInNative::SendHex(void)
 	}
 
 	str_2_byte(OUTBUFFER, s, l);
-	l /=2;
+	l /= 2;
 	OUTBUFFER[l] = 0;
-
-
-	//bStatus = WriteFile(hComm, &OUTBUFFER, l, &bytes_written, NULL);
-	//if (!bStatus)
-	//{
-	//	m_err = -2;
-	//	return -2; //error while data send
-	//}
 	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
 
 	write_log(OUTBUFFER, l, 's');	
@@ -1688,7 +1564,6 @@ int CAddInNative::RecieveHex(void)
 {
 	char	INBUFFER[1024];
 	DWORD   bytes_read = 0;
-	//int		bStatus;
 
 	std::string s;
 
@@ -1696,12 +1571,6 @@ int CAddInNative::RecieveHex(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	//bStatus = ReadFile(hComm, &INBUFFER, 1024, &bytes_read, NULL);
-	//if (!bStatus)
-	//{
-	//	m_err = -1;
-	//	return -1; //error while data recieve
-	//}
 	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
 
 	write_log(INBUFFER, bytes_read, 'r');

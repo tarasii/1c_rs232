@@ -50,6 +50,8 @@ public:
 		eMethGetWeightACS,
 		eMethGetWeightVTA,
 		eMethSetPriceVTA,
+		eMethSetPriceLed8N,
+		eMethSetStatusLed8N,
 		eMethLast      // Always last
     };
 
@@ -108,14 +110,18 @@ private:
 	int CAddInNative::SendIKS(uint8_t cmd);
 	int CAddInNative::SendHex(void);
 	int CAddInNative::RecieveHex(void);
-	bool CAddInNative::SendMaria( tVariant* pvarRetValue, tVariant* paParams, const long lSizeArray);
+	int CAddInNative::SendMaria( tVariant* paParams, const long lSizeArray);
 	uint8_t CAddInNative::InitMaria(void);
+	int CAddInNative::SendMariaCommand();
+	int CAddInNative::GetMariaAnswer();
 	std::wstring CAddInNative::ToHEX(std::wstring s);
 	std::wstring CAddInNative::FromHEX(std::wstring s);
 	void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type);
 	int CAddInNative::Recieve(void);
 	int CAddInNative::GetWeightVTA(void);
-	int CAddInNative::SetPriceVTA(uint32_t price);
+	int CAddInNative::SetPriceVTA(uint64_t price);
+    int CAddInNative::SetPriceLed8N(std::wstring s);
+	int CAddInNative::SetStatusLed8N(std::wstring s);
 
 
 	// Attributes
