@@ -151,7 +151,7 @@ long CAddInNative::GetInfo()
 { 
     // Component should put supported component technology version 
     // This component supports 2.0 version
-    return 2017; 
+    return 2021; 
 }
 //---------------------------------------------------------------------------//
 void CAddInNative::Done()
@@ -409,7 +409,7 @@ long CAddInNative::GetNParams(const long lMethodNum)
         return 5;
     case eMethSendIKS:
     case eMethTest:
-		return 2;
+		return 1;
     case eMethSend:
 	case eMethStartTimer:
     case eMethSendHex:
@@ -727,20 +727,26 @@ bool CAddInNative::CallAsFunc(const long lMethodNum,
 		break;
 	case eMethTest:
 		ret = false;
-		res = CAddInNative::OpenPort(paParams);
-		if (res == 0) {	
-			ret = true;
-			//CAddInNative::ClosePort();
+		if (TV_VT(paParams)== VTYPE_PWSTR)
+		{
+			tmpwstr = (paParams)->pwstrVal;
 		}
-		TV_VT(pvarRetValue) = VTYPE_BOOL;
-		TV_BOOL(pvarRetValue) = ret;
 
-		//if (m_iConnect) {
-		//	m_iConnect->SetStatusLine(strOK);
-		//	//m_iConnect->Alert(strOK);
-		//}
+		if (m_iConnect) {
+			//const wchar_t* wcs = tmpwstr.c_str();
+			//m_iConnect->SetStatusLine(tmpwstr.c_str());
+            
+			IAddInDefBaseEx* cnn = (IAddInDefBaseEx*)m_iConnect;
+            IMsgBox* imsgbox = (IMsgBox*)cnn->GetInterface(eIMsgBox);
+            if (imsgbox)
+			{	
+                 imsgbox->Alert(tmpwstr.c_str());
+			}
+		}
 
 		ret = true;
+		TV_VT(pvarRetValue) = VTYPE_BOOL;
+		TV_BOOL(pvarRetValue) = ret;
 		break;
 	case eMethGetWeightACS:
 		res = CAddInNative::GetWeightACS();

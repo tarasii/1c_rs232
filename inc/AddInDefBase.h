@@ -7,6 +7,14 @@
 #define __ADAPTER_DEF_H__
 #include "types.h"
 
+struct IInterface{};
+
+enum Interfaces
+{
+    eIMsgBox = 0,
+    eIPlatformInfo,
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 /**
  * This class serves as representation of a platform for external 
@@ -88,12 +96,31 @@ public:
      *  @param wszStatusLine - new status line contents
      *  @return the result of
      */
-    virtual bool ADDIN_API SetStatusLine(WCHAR_T* wszStatusLine) = 0;
+    virtual bool ADDIN_API SetStatusLine(const WCHAR_T* wszStatusLine) = 0;
     /// Resets the status line contents
     /**
      *  @return the result of
      */
     virtual void ADDIN_API ResetStatusLine() = 0;
+
+
 };
+
+class IAddInDefBaseEx : IAddInDefBase
+{
+public:
+    virtual ~IAddInDefBaseEx() {}
+
+    virtual IInterface* ADDIN_API GetInterface(Interfaces iface) = 0;
+
+};
+
+struct IMsgBox : IInterface
+{
+    virtual bool ADDIN_API Confirm(const WCHAR_T* queryText, tVariant* retVal) = 0;
+
+    virtual bool ADDIN_API Alert(const WCHAR_T* text) = 0;
+};
+
 
 #endif //__ADAPTER_DEF_H__
