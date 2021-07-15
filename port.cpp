@@ -210,7 +210,7 @@ DWORD CPort::SendBufAsync(LPVOID lpBuf, DWORD dwBytesToWrite)
 	if (!bResult)
 	{
 		dwError = GetLastError();
-		if(dwError != ERROR_IO_PENDING)
+		if((dwError != ERROR_IO_PENDING)&&(dwError != NO_ERROR))
 		{
 			//ошибка записи
 			m_err = PORT_ERR_ASYNCWRITESTART;
@@ -271,7 +271,8 @@ DWORD CPort::ReadBufSync(LPVOID lpBuf, DWORD dwBytesToRead)
 		return 0;
 	}
 
-	bResult = ReadFile(hComm, &lpBuf, dwBytesToRead, &dwBytesRead, NULL);
+	//feature while recieve testet on VC2008 express: shuld be lpBuf not &lpBuf
+	bResult = ReadFile(hComm, lpBuf, dwBytesToRead, &dwBytesRead, NULL);
 	if (!bResult)
 	{
 		m_err = PORT_ERR_REED;

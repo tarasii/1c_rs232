@@ -418,9 +418,7 @@ long CAddInNative::GetNParams(const long lMethodNum)
 	case eMethFromHex:
 	case eMethSendMaria:
 	case eMethSetPriceVTA:
-		return 1;
 	case eMethSetPriceLed8N:
-		return 1;
 	case eMethSetStatusLed8N:
 		return 1;
     default:
@@ -931,7 +929,8 @@ uint8_t CAddInNative::OpenPort(tVariant* paParams)
 	}
 
 	
-	m_ComPort.Open(m_port, m_baud, m_byteSize, m_parity, m_stopBit, true);
+	//m_ComPort.Open(m_port, m_baud, m_byteSize, m_parity, m_stopBit, true);
+	m_ComPort.Open(m_port, m_baud, m_byteSize, m_parity, m_stopBit, false);
 
 	write_log("\0\0\0\0\0", 5, 'o');
 
@@ -986,6 +985,7 @@ void CAddInNative::write_log(char* OUTBUFFER, int l, char log_type)
 int CAddInNative::Send(void)
 {
 	char	*OUTBUFFER;
+	//char	OUTBUFFER[256];
 	DWORD   bytes_written = 0;
 
 	uint8_t l;
@@ -998,9 +998,15 @@ int CAddInNative::Send(void)
 	l = s.length();
 
 	OUTBUFFER = (char *) malloc(l * sizeof(char));
+	if (l > 256)
+	{
+		m_err = -1;
+		return -1; //to long command
+	}
+
 	memcpy(OUTBUFFER, s.c_str(), l);
 
-	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	bytes_written = m_ComPort.SendBuf(OUTBUFFER, l);
 	write_log(OUTBUFFER, l, 's');		
 	
 	m_err = -m_ComPort.GetLastError();
@@ -1070,7 +1076,7 @@ int CAddInNative::SendIKS(uint8_t cmd)
 	//	return -3; //error while data send
 	//}
 
-	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	bytes_written = m_ComPort.SendBuf(OUTBUFFER, l);
 	m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return m_err;
 
@@ -1087,7 +1093,7 @@ int CAddInNative::SendIKS(uint8_t cmd)
 		//	return -4; //error while data recieve
 		//}
 		
-		bytes_read = m_ComPort.ReadBuf(&TMPBUFFER, 64);
+		bytes_read = m_ComPort.ReadBuf(TMPBUFFER, 64);
 		m_err = -m_ComPort.GetLastError();
 		if (m_err != 0) return m_err;
 
@@ -1177,9 +1183,9 @@ int CAddInNative::SendMariaCommand()
 
 	if (m_loging) write_log(OUTBUFFER, l+3, 'c');
 
-	//bStatus = WriteFile(hComm, &OUTBUFFER, l+3, &bytes_written, NULL);
+	//bStatus = WriteFile(hComm, OUTBUFFER, l+3, &bytes_written, NULL);
     //if (!bStatus ) return return_error(5); //error while data send
-	m_ComPort.SendBuf(&OUTBUFFER, l+3);
+	m_ComPort.SendBuf(OUTBUFFER, l+3);
 	//m_err = -m_ComPort.GetLastError();
 	if (m_err != 0) return 5; //error while data send
 
@@ -1222,7 +1228,7 @@ int CAddInNative::GetMariaAnswer()
 		//if (!bStatus) return return_error(6); //error while data recieve
 		//if (!bStatus) return false; //error while data recieve
 
-		bytes_read = m_ComPort.ReadBuf(&SMBUFFER, 50);
+		bytes_read = m_ComPort.ReadBuf(SMBUFFER, 50);
 		m_err = -m_ComPort.GetLastError();
 		if (m_err != 0) return 6;
 		
@@ -1505,7 +1511,7 @@ int CAddInNative::Recieve(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
+	bytes_read = m_ComPort.ReadBuf(INBUFFER, 1024);
 	write_log(INBUFFER, bytes_read, 'r');
 	
 	m_err = -m_ComPort.GetLastError();
@@ -1524,20 +1530,11 @@ int CAddInNative::SendHex(void)
 	char	OUTBUFFER[256];
 	DWORD   bytes_written = 0;
 
-	//int		bStatus;
 	uint8_t l;
-	//char ss[50];
 
 	std::string s;
 
 	m_err = 0;
-
-	l = m_cmd.length();
-	if (l > 512)
-	{
-		m_err = -1;
-		return -1; //to long command
-	}
 
 	s = wstrtostr(m_cmd);
 	l = s.length();
@@ -1549,8 +1546,7 @@ int CAddInNative::SendHex(void)
 
 	str_2_byte(OUTBUFFER, s, l);
 	l /= 2;
-	OUTBUFFER[l] = 0;
-	bytes_written = m_ComPort.SendBuf(&OUTBUFFER, l);
+	bytes_written = m_ComPort.SendBuf(OUTBUFFER, l);
 
 	write_log(OUTBUFFER, l, 's');	
 
@@ -1571,7 +1567,7 @@ int CAddInNative::RecieveHex(void)
 	m_err = 0;
 
 	bytes_read = 0;
-	bytes_read = m_ComPort.ReadBuf(&INBUFFER, 1024);
+	bytes_read = m_ComPort.ReadBuf(INBUFFER, 1024);
 
 	write_log(INBUFFER, bytes_read, 'r');
 
