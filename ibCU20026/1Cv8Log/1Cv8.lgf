@@ -1,0 +1,19 @@
+﻿1CV8LOG(ver 2.0)
+7e2ab7c1-92e4-4a8d-9301-ce5c69d72b3c
+{1,071523a4-516f-4fce-ba4b-0d11ab7a1893,"",1},
+{2,"TSRV14",1},
+{3,"Designer",1},
+{4,"_$Session$_.Authentication",1},
+{11,
+{0},1},
+{12,
+{0},1},
+{13,1,1},
+{4,"_$Session$_.Start",2},
+{4,"_$InfoBase$_.ConfigUpdate",3},
+{4,"_$InfoBase$_.DBConfigUpdate",4},
+{3,"1CV8C",2},
+{4,"_$Transaction$_.Begin",5},
+{4,"_$Transaction$_.Commit",6},
+{4,"_$Session$_.Finish",7},
+{4,"_$PerformError$_",8}
