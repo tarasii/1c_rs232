@@ -1528,6 +1528,10 @@
 					/>
 				</FileConfiguration>
 			</File>
+			<File
+				RelativePath=".\inc\utils.cpp"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
@@ -1544,6 +1548,10 @@
 			</File>
 			<File
 				RelativePath=".\stdafx.h"
+				>
+			</File>
+			<File
+				RelativePath=".\inc\utils.h"
 				>
 			</File>
 		</Filter>

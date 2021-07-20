@@ -96,7 +96,7 @@ public:
      *  @param wszStatusLine - new status line contents
      *  @return the result of
      */
-    virtual bool ADDIN_API SetStatusLine(const WCHAR_T* wszStatusLine) = 0;
+    virtual bool ADDIN_API SetStatusLine(WCHAR_T* wszStatusLine) = 0;
     /// Resets the status line contents
     /**
      *  @return the result of
